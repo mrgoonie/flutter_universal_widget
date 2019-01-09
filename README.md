@@ -69,15 +69,32 @@ RaisedButton(
 ```
 Think about how you will do this with StatefulWidget, I bet it would cost you at least 20 lines of code. Now looks back...
 
-Oh wait, you can change its visibility as well:
+There are a lot more features that can unlock the true power of **UniversalWidget**. Such as:
+
+To manage the **UniversalWidget**'s visibility:
 ```
 myWidget.update(visible: false);
 // turns its visibility on by: myWidget.update(visible: true);
 ```
 
+You can even change the child widget of **UniversalWidget**:
+```
+myWidget.update(
+  child: Text("Holy Shiettttt!")
+);
+```
+
+Masking (clipping) the child widget of **UniversalWidget** by setting `mask` flag:
+```
+myWidget.update(
+  mask: true,
+  child: Text("Holy Shiettttt!")
+);
+```
+
 ## Animation
 
-I admit that AnimatedContainer does a good job. But **UniversalWidget** can do much better:
+I admit that `AnimatedContainer` does a good job. But **UniversalWidget** can do animation much better:
 ```
 UniversalWidget myWidget = UniversalWidget(
   color: Colors.red,
