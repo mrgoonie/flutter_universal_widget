@@ -1,4 +1,9 @@
-## [1.1.0] - Fixed some minor bugs.
+## [1.1.1] - Fixed some minor bugs.
+
+* Update documentation.
+* Added example.
+
+## [1.1.0] - Added more features & Fixed some minor bugs.
 
 * Updated the documentation.
 * Added button mode with `onPressed`.
