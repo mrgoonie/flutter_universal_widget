@@ -1,6 +1,4 @@
-# universal_widget
-
-## The Mighty UniversalWidget
+# The Mighty UniversalWidget
 
 I'm just so excited to introduce to you my superhero widget: **UniversalWidget**
 

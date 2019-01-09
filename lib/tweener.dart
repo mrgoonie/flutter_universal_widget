@@ -1,12 +1,12 @@
 library tweener;
 
-// version 0.1.5
-
 import 'package:flutter/animation.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:universal_widget/universal_widget.dart';
+
+// version 0.1.6
 
 /// A callback method when the tween animation updating
 typedef void OnTweenerUpdateCallback(double progress);
@@ -155,6 +155,8 @@ class Tweener implements TickerProvider {
   void _init() {
     // print("init tweener");
     _oldData = target.clone();
+    _oldData.width = target.state.context.size.width ?? 0;
+    _oldData.height = target.state.context.size.height ?? 0;
     
     if(transformOrigin != null) target.transformOrigin = transformOrigin;
 
@@ -203,8 +205,9 @@ class Tweener implements TickerProvider {
       _animationMargin = EdgeInsetsTween(begin: target.margin, end: margin).animate(curve);
       _animationMargin.addListener(_onMarginAnimating);
     }
-
-    if(top != null || left != null || right != null || bottom != null 
+    
+    // Trying to improve performance: [Removed]
+    /* if(top != null || left != null || right != null || bottom != null 
     || width != null || height != null
     || opacity != null || scale != null || x != null || y != null)
     {
@@ -212,7 +215,14 @@ class Tweener implements TickerProvider {
       _animation.addStatusListener(_onAnimationStatus);
       _animation.addListener(_onAnimating);
       shouldAnimating = true;
-    }
+    } */
+
+    // Note: Always run animation because it's possible 
+    // to tween "width" and "height" to null now!
+    _animation = Tween(begin: 0.0, end: 1.0).animate(curve);
+    _animation.addStatusListener(_onAnimationStatus);
+    _animation.addListener(_onAnimating);
+    shouldAnimating = true;
 
     // print("shouldAnimating = $shouldAnimating");
     if(!shouldAnimating){
@@ -250,8 +260,18 @@ class Tweener implements TickerProvider {
         target.bottom = _oldData.bottom + progress * (bottom - _oldData.bottom);
       }
       
-      if(width != null) target.width = _oldData.width + progress * (width - _oldData.width);
-      if(height != null) target.height = _oldData.height + progress * (height - _oldData.height);
+      if(width != null){
+        target.width = _oldData.width + progress * (width - _oldData.width);
+      } else {
+        target.width = _oldData.width + progress * (target.state.initSize.width - _oldData.width);
+      }
+      
+      if(height != null){
+        target.height = _oldData.height + progress * (height - _oldData.height);
+      } else {
+        target.height = _oldData.height + progress * (target.state.initSize.height - _oldData.height);
+      }
+
       if(opacity != null) target.opacity = _oldData.opacity + progress * (opacity - _oldData.opacity);
       if(rotation != null) target.rotation = _oldData.rotation + progress * (rotation - _oldData.rotation);
 
@@ -290,10 +310,7 @@ class Tweener implements TickerProvider {
   }
 
   void _onAnimationStatus(status){
-    // print("a");
     if (status == AnimationStatus.completed) {
-      if(onComplete != null) onComplete();
-
       if(yoyo){
         _controller.reverse();
       } else {
@@ -305,8 +322,8 @@ class Tweener implements TickerProvider {
           }
         }
       }
+      if(onComplete != null) onComplete();
     } else if (status == AnimationStatus.dismissed) {
-      // print("dismissed");
       if(repeat != 0) {
         _controller.forward();
         if(yoyo) _countRepeatEnd();
