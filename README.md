@@ -8,7 +8,10 @@ You can find the package at: https://pub.dartlang.org/packages/universal_widget
 
 With **UniversalWidget**, you will have full control with it in the widget tree. 
 
-### Write less, do more.
+![alt text](https://cdn-images-1.medium.com/max/1600/1*zMEbgk6vN2oZTOGRLZpagA.gif "Login Animation with UniversalWidget")
+###### I made this login animation with UniversalWidget in only 8 lines of code. If you want to know how to do it with Flutter, see this cool tutorial: https://blog.geekyants.com/flutter-login-animation-ab3e6ed4bd19
+
+# Write less, do more.
 
 For example, instead of:
 ```
