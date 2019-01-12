@@ -449,12 +449,14 @@ class _UniversalWidgetState extends State<UniversalWidget> {
       UniversalWidget.remove(widget.name);
     }
 
+    widget.controller._markWitgetWasNotBuilt();
+
     if(widget.onWidgetDisposed != null) widget.onWidgetDisposed(widget);
   }
 
-  _trace(String msg){
+  /* _trace(String msg){
     if(widget.name != null) print("UniversalWidget<${widget.name}>: $msg");
-  }
+  } */
 
   Future<void> _executeAfterFirstBuild() async {
     // _trace("${widget.controller.mask}");
