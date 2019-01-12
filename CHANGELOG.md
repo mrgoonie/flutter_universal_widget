@@ -1,3 +1,13 @@
+## [1.1.2] - More features & fixed bugs.
+
+* Changed `onWidgetBuilt(BuildContext)` to `onWidgetBuild(UniversalWitget)`.
+* Added `onWidgetUpdated(UniversalWidget)`.
+* Added `override (bool)` to `update()` method, default value is `true`, so you can do multiple `update()` animation at the sametime. 
+* Added `stopAnimation()` method in case you want to stop all animations of the widget.
+* Added `interaction` properties to enable/disable interactivity of the widget.
+* Fixed losing state issue (when update widget while state hasn't been created).
+* Fixed some minor bugs.
+
 ## [1.1.1] - Fixed some minor bugs.
 
 * Update documentation.

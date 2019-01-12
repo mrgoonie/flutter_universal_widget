@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:universal_widget/universal_widget.dart';
 
-// version 0.1.6
+// version 0.1.7
 
 /// A callback method when the tween animation updating
 typedef void OnTweenerUpdateCallback(double progress);
@@ -207,7 +207,7 @@ class Tweener implements TickerProvider {
     }
     
     // Trying to improve performance: [Removed]
-    /* if(top != null || left != null || right != null || bottom != null 
+    if(top != null || left != null || right != null || bottom != null 
     || width != null || height != null
     || opacity != null || scale != null || x != null || y != null)
     {
@@ -215,14 +215,14 @@ class Tweener implements TickerProvider {
       _animation.addStatusListener(_onAnimationStatus);
       _animation.addListener(_onAnimating);
       shouldAnimating = true;
-    } */
+    }
 
     // Note: Always run animation because it's possible 
     // to tween "width" and "height" to null now!
-    _animation = Tween(begin: 0.0, end: 1.0).animate(curve);
-    _animation.addStatusListener(_onAnimationStatus);
-    _animation.addListener(_onAnimating);
-    shouldAnimating = true;
+    // _animation = Tween(begin: 0.0, end: 1.0).animate(curve);
+    // _animation.addStatusListener(_onAnimationStatus);
+    // _animation.addListener(_onAnimating);
+    // shouldAnimating = true;
 
     // print("shouldAnimating = $shouldAnimating");
     if(!shouldAnimating){

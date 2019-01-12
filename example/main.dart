@@ -91,7 +91,6 @@ class HomeScreen extends StatelessWidget {
                     UniversalWidget.find("testWidget").update(
                       duration: 0.5,
                       color: Colors.blueAccent,
-                      yoyo: true
                     );
                   },
                 ),

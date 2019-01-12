@@ -7,11 +7,14 @@ import 'dart:math' as math;
 // export
 export 'package:universal_widget/tweener.dart';
 
-// version 1.1.0
-// added button mode with `onPressed`
-// added `mask` (clip) feature
-// added `update(child)` feature
-// fixed some minor bugs
+// version 1.1.2
+// Changed `onWidgetBuilt(BuildContext)` to `onWidgetBuild(UniversalWitget)`.
+// Added `onWidgetUpdated(UniversalWidget)`.
+// Added `override (bool)` to `update()` method, default value is `true`, so you can do multiple `update()` animation at the sametime. 
+// Added `stopAnimation()` method in case you want to stop all animations of the widget.
+// Added `interaction` properties to enable/disable interactivity of the widget.
+// Fixed losing state issue (when update widget while state hasn't been created).
+// Fixed some minor bugs.
 
 /// Custom method callback with return any value
 typedef void ReturnVoidCallback({dynamic result});
@@ -41,6 +44,7 @@ class UniversalWidget extends StatefulWidget {
     EdgeInsetsGeometry margin, padding,
     Offset scale, transformOrigin, // transform matrix
     // display mode
+    this.interaction = true,
     this.visible = true,
     this.mask = false,
     // animation options
@@ -50,6 +54,7 @@ class UniversalWidget extends StatefulWidget {
     // widget callbacks
     this.onWidgetInit,
     this.onWidgetBuilt,
+    this.onWidgetUpdated,
     this.onWidgetDisposed,
     // button mode
     this.onPressed,
@@ -68,7 +73,7 @@ class UniversalWidget extends StatefulWidget {
   final Color color;
   final Offset scale, transformOrigin;
   final EdgeInsetsGeometry margin, padding;
-  final bool visible, mask;
+  final bool interaction, visible, mask;
   final Border border;
   final BorderRadius borderRadius;
   final List<BoxShadow> boxShadow;
@@ -81,12 +86,24 @@ class UniversalWidget extends StatefulWidget {
   /// Callback method to listen for the widget's initializing event
   final VoidCallback onWidgetInit;
   /// Callback method to listen for the event after the widget was built
-  final ValueChanged<BuildContext> onWidgetBuilt;
+  final ValueChanged<UniversalWidget> onWidgetBuilt;
   /// Callback method to listen for the widget's disposing event
   final ValueChanged<UniversalWidget> onWidgetDisposed;
+  /// Callback method to listen for the widget's updating event
+  final ValueChanged<UniversalWidget> onWidgetUpdated;
 
   /// Callback method to listen for pressing (tapping) event
   final ValueChanged<UniversalWidget> onPressed;
+
+  /// Stop all current animations of the widget. (Same function with `killAllTweens()`)
+  void stopAnimation(){
+    killAllTweens();
+  }
+
+  /// Stop the current animation of the widget. (Same function with `stopAnimation()`)
+  void killAllTweens(){
+    if(controller!= null) controller.killAllTweens();
+  }
   
   /// Updates the properties of the widget, with animation options.
   void update({
@@ -99,77 +116,95 @@ class UniversalWidget extends StatefulWidget {
     List<BoxShadow> boxShadow,
     bool visible,
     bool mask,
+    Widget child,
+    // animation options
     double duration,
     Curve ease = Ease.ease,
     bool yoyo = false,
+    bool override = true,
     int repeat = 0,
     double delay,
-    Widget child,
     OnTweenerUpdateCallback onUpdate,
     VoidCallback onComplete,
   }){
-    controller.killAllTweens();
+    
+    processUpdating(){
+      if(!override || duration == null) controller.killAllTweens();
 
-    if(child != null){
-      controller.child = child;
+      if(child != null){
+        controller.child = child;
+      }
+
+      if(mask != null && mask != controller.mask) controller.mask = mask;
+
+      if(animateWhenUpdate || duration != null){
+        // print("${controller.width} x ${controller.height}");
+        if(width != null && controller.width == null) controller._width = controller._state._initSize.width;
+        if(height != null && controller.height == null) controller._height = controller._state._initSize.height;
+
+        if(visible != null) controller.visible = visible;
+
+        Tweener.to(controller, duration ?? durationWhenUpdate, 
+          x: x,
+          y: y,
+          width: width,
+          height: height,
+          top: top,
+          left: left,
+          right: right,
+          bottom: bottom,
+          opacity: opacity,
+          scale: scale,
+          rotation: rotation,
+          color: color,
+          border: border,
+          borderRadius: borderRadius,
+          transformOrigin: transformOrigin,
+          margin: margin,
+          padding: padding,
+          // animation options
+          ease: ease ?? easeWhenUpdate ?? Ease.ease,
+          delay: delay,
+          yoyo: yoyo,
+          repeat: repeat,
+          onUpdate: onUpdate,
+          onComplete: onComplete,
+        );
+      } else {
+        if(x != null) controller.x = x + .0;
+        if(y != null) controller.y = y + .0;
+        if(width != null) controller.width = width + .0;
+        if(height != null) controller.height = height + .0;
+        if(rotation != null) controller.rotation = rotation + .0;
+        if(opacity != null) controller.opacity = opacity + .0;
+        if(color != null) controller.color = color;
+        if(border != null) controller.border = border;
+        if(borderRadius != null) controller.borderRadius = borderRadius;
+        if(transformOrigin != null) controller.transformOrigin = transformOrigin;
+        if(scale != null) controller.scale = scale;
+        if(margin != null) controller.margin = margin;
+        if(padding != null) controller.padding = padding;
+        if(visible != null) controller.visible = visible;
+        if(boxShadow != null) controller.boxShadow = boxShadow;
+
+        if(top != null) controller.top = top + .0;
+        if(bottom != null) controller.bottom = bottom + .0;
+        if(left != null) controller.left = left + .0;
+        if(right != null) controller.right = right + .0;
+      }
     }
 
-    if(mask != null && mask != controller.mask) controller.mask = mask;
+    void buildListener(){
+      if(controller.state != null){
+        controller.removeListener(buildListener);
+        processUpdating();
+      }
+    }
 
-    if(animateWhenUpdate || duration != null){
-      // print("${controller.width} x ${controller.height}");
-      if(width != null && controller.width == null) controller._width = controller._state._initSize.width;
-      if(height != null && controller.height == null) controller._height = controller._state._initSize.height;
-
-      if(visible != null) controller.visible = visible;
-
-      Tweener.to(controller, duration ?? durationWhenUpdate, 
-        x: x,
-        y: y,
-        width: width,
-        height: height,
-        top: top,
-        left: left,
-        right: right,
-        bottom: bottom,
-        opacity: opacity,
-        scale: scale,
-        rotation: rotation,
-        color: color,
-        border: border,
-        borderRadius: borderRadius,
-        transformOrigin: transformOrigin,
-        margin: margin,
-        padding: padding,
-        // animation options
-        ease: ease ?? easeWhenUpdate ?? Ease.ease,
-        delay: delay,
-        yoyo: yoyo,
-        repeat: repeat,
-        onUpdate: onUpdate,
-        onComplete: onComplete,
-      );
+    if(controller.state == null){
+      controller.addListener(buildListener);
     } else {
-      if(x != null) controller.x = x + .0;
-      if(y != null) controller.y = y + .0;
-      if(width != null) controller.width = width + .0;
-      if(height != null) controller.height = height + .0;
-      if(rotation != null) controller.rotation = rotation + .0;
-      if(opacity != null) controller.opacity = opacity + .0;
-      if(color != null) controller.color = color;
-      if(border != null) controller.border = border;
-      if(borderRadius != null) controller.borderRadius = borderRadius;
-      if(transformOrigin != null) controller.transformOrigin = transformOrigin;
-      if(scale != null) controller.scale = scale;
-      if(margin != null) controller.margin = margin;
-      if(padding != null) controller.padding = padding;
-      if(visible != null) controller.visible = visible;
-      if(boxShadow != null) controller.boxShadow = boxShadow;
-
-      if(top != null) controller.top = top + .0;
-      if(bottom != null) controller.bottom = bottom + .0;
-      if(left != null) controller.left = left + .0;
-      if(right != null) controller.right = right + .0;
+      processUpdating();
     }
   }
 
@@ -197,12 +232,8 @@ class UniversalWidget extends StatefulWidget {
     if(bottom != widget.bottom) return true;
     if(boxShadow != widget.boxShadow) return true;
     if(visible != widget.visible) return true;
+    if(interaction != widget.interaction) return true;
     return false;
-  }
-
-  /// Stop the animation of the widget
-  killAllTweens(){
-    if(controller!= null) controller.killAllTweens();
   }
 
   /// Get size of the widget (return `Size.zero` if the widget has been built yet).
@@ -229,7 +260,11 @@ class UniversalWidget extends StatefulWidget {
   static List<UniversalWidget> _list = [];
   
   /// {Debug purspose only} To see how many `UniversalWidget` are existed on the screens.
-  static debug() => _list.forEach((i) => print("UniversalWidget<${i.name}>"));
+  static debug(){
+    print("============ UniversalWidgetDebug [START] ============");
+    _list.forEach((i) => print("UniversalWidget<${i.name}>"));
+    print("============ UniversalWidgetDebug [END] ============");
+  }
   
   /// Get the `UniversalWidget` from device memory by its unique given name
   static UniversalWidget find(String name){
@@ -252,9 +287,8 @@ class UniversalWidget extends StatefulWidget {
   static add(UniversalWidget widget){
     if(exists(widget.name)){
       remove(widget.name);
-    } else {
-      _list.add(widget);
     }
+    _list.add(widget);
   }
 
   /// Remove `UniversalWidget` from device memory by its unique given name
@@ -296,9 +330,9 @@ class _UniversalWidgetState extends State<UniversalWidget> {
     super.didUpdateWidget(oldWidget);
 
     // UniversalWidget.wipeOut(); // clear the memory
+    widget.controller._state = this;
     
     if(widget.controller != oldWidget.controller){
-      widget.controller._state = oldWidget.controller._state;
       widget.controller._widget = widget;
 
       widget.controller._mask = (widget.mask != oldWidget.mask) ? widget.mask : oldWidget.controller.mask;
@@ -315,6 +349,7 @@ class _UniversalWidgetState extends State<UniversalWidget> {
       widget.controller._transformOrigin = (widget.transformOrigin != oldWidget.transformOrigin) ? widget.transformOrigin : oldWidget.controller.transformOrigin;
       widget.controller._opacity = (widget.opacity != oldWidget.opacity) ? widget.opacity : oldWidget.controller.opacity;
       widget.controller._visible = (widget.visible != oldWidget.visible) ? widget.visible : oldWidget.controller.visible;
+      widget.controller._interaction = (widget.interaction != oldWidget.interaction) ? widget.interaction : oldWidget.controller.interaction;
       widget.controller._color = (widget.color != oldWidget.color) ? widget.color : oldWidget.controller.color;
       widget.controller._margin = (widget.margin != oldWidget.margin) ? widget.margin : oldWidget.controller.margin;
       widget.controller._padding = (widget.padding != oldWidget.padding) ? widget.padding : oldWidget.controller.padding;
@@ -338,6 +373,10 @@ class _UniversalWidgetState extends State<UniversalWidget> {
     _canChangePosition = (_parentRenderType == "RenderStack");
 
     _isBuiltFirstTime = true;
+
+    if(widget.onWidgetUpdated != null){
+      widget.onWidgetUpdated(widget);
+    }
   }
 
   @override
@@ -367,6 +406,7 @@ class _UniversalWidgetState extends State<UniversalWidget> {
     widget.controller.transformOrigin = widget.transformOrigin;
     widget.controller.opacity = widget.opacity;
     widget.controller.visible = widget.visible;
+    widget.controller.interaction = widget.interaction;
     widget.controller.margin = widget.margin;
     widget.controller.padding = widget.padding;
     widget.controller.boxShadow = widget.boxShadow;
@@ -378,14 +418,13 @@ class _UniversalWidgetState extends State<UniversalWidget> {
 
     widget.controller.addListener(_widgetListener);
 
+    if(widget.onWidgetUpdated != null) widget.onWidgetUpdated(widget);
     if(widget.onWidgetInit != null) widget.onWidgetInit();
+
+    // _trace("Initialized!");
   }
 
   _widgetListener(){
-    // print("[UniversalWidget] Updated!");
-    // print(widget.controller._state.hashCode);
-    // widget.controller._state = this;
-    // _trace("${widget.controller.mask} / ${_oldController.mask}");
     // rebuild the widget:
     if(mounted) setState((){});
 
@@ -396,6 +435,8 @@ class _UniversalWidgetState extends State<UniversalWidget> {
   void dispose() {
     super.dispose();
 
+    // widget.controller._forceRebuildWidget = true;
+
     if(widget.controller != null){
       widget.controller.removeListener(_widgetListener);
       // widget.controller.dispose();
@@ -404,16 +445,16 @@ class _UniversalWidgetState extends State<UniversalWidget> {
     if(_oldController != null) _oldController.dispose();
     
     if(widget.name != null){
-      // print("$widget<${widget.name}> is disposed!");
+      // _trace("Disposed!");
       UniversalWidget.remove(widget.name);
     }
 
     if(widget.onWidgetDisposed != null) widget.onWidgetDisposed(widget);
   }
 
-  // _trace(String msg){
-  //   if(widget.name != null) print("UniversalWidget<${widget.name}>: $msg");
-  // }
+  _trace(String msg){
+    if(widget.name != null) print("UniversalWidget<${widget.name}>: $msg");
+  }
 
   Future<void> _executeAfterFirstBuild() async {
     // _trace("${widget.controller.mask}");
@@ -426,29 +467,26 @@ class _UniversalWidgetState extends State<UniversalWidget> {
         widget.controller._width = widget.width;
         widget.controller._height = widget.height;
       }
-      if(widget.onWidgetBuilt != null) widget.onWidgetBuilt(context);
+      if(widget.onWidgetBuilt != null) widget.onWidgetBuilt(widget);
     }
 
     if(widget.name != null){
-      // print(UniversalWidget.exists(widget.name));
-      // UniversalWidget.remove(widget.name);
-      // if(UniversalWidget.exists(widget.name)) print("[INIT WARNING] There are multiple <UniversalWidget> with the same name \"${widget.name}\".");
       UniversalWidget.add(widget);
-      // print("$widget<${widget.name}> is initialized!");
+      // _trace("Built!");
     }
+
+    widget.controller._markWitgetWasBuilt();
   }
 
   @override
   Widget build(BuildContext context) {
+    widget.controller._state = this; // update state
+
     if(_isBuiltFirstTime || (widget.controller.mask != _oldController.mask) || (widget.controller.child != _oldController.child) || widget.controller._forceRebuildWidget){
       _isBuiltFirstTime = false;
       widget.controller._forceRebuildWidget = false;
       WidgetsBinding.instance.addPostFrameCallback((_) => _executeAfterFirstBuild());
     }
-
-    widget.controller._state = this;
-    
-    // print(widget.controller.margin);
 
     Widget container;
     Widget child = widget.controller.child;
@@ -487,14 +525,9 @@ class _UniversalWidgetState extends State<UniversalWidget> {
     container = Container(
       width: widget.controller.width,
       height: widget.controller.height,
+      // spacing
       padding: widget.controller.padding,
       margin: widget.controller.margin,
-      // transform matrix
-      // transform: (shouldApplyTransformMatrix) ? (Matrix4.identity()
-      //   ..translate(widget.controller.x, widget.controller.y)
-      //   ..rotateZ((widget.controller.rotation) * math.pi / 180)
-      //   ..scale(widget.controller.scale.dx, widget.controller.scale.dy)) : null,
-      // alignment: align,
       // box decoration
       decoration: BoxDecoration(
         color: widget.controller.color,
@@ -518,17 +551,6 @@ class _UniversalWidgetState extends State<UniversalWidget> {
       );
     }
 
-    if(widget.controller.opacity != 1 || (widget.controller.opacity == 1 && _oldController.opacity != 1)){
-      double newOpacity = widget.controller.opacity;
-      newOpacity = (newOpacity < 0) ? 0 : ((newOpacity > 1) ? 1 : newOpacity);
-      // newOpacity = (newOpacity > 1) ? 1 : newOpacity;
-      container = Opacity(
-        // alwaysIncludeSemantics: true,
-        opacity: newOpacity,
-        child: container
-      );
-    }
-
     if(_canChangePosition){
       // print("${widget.name}: ${widget.controller.top} / ${widget.controller.left} / ${widget.controller.right} / ${widget.controller.bottom}");
       if(widget.controller.top != null || widget.controller.left != null || widget.controller.right != null || widget.controller.bottom != null){
@@ -548,8 +570,32 @@ class _UniversalWidgetState extends State<UniversalWidget> {
         child: container,
       );
     }
-    
-    return (widget.controller.visible) ? container : Container();
+
+    double newOpacity = widget.controller.opacity;
+
+    if(!widget.controller.visible){
+      newOpacity = 0.0;
+    }
+
+    if(newOpacity != 1 || (newOpacity == 1 && _oldController.opacity != 1)){
+      // make sure opacity is larger than 0.0 & smaller than 1.0
+      newOpacity = (newOpacity < 0.0) ? 0.0 : ((newOpacity > 1) ? 1 : newOpacity);
+      
+      container = Opacity(
+        alwaysIncludeSemantics: true,
+        opacity: newOpacity,
+        child: container
+      );
+    }
+
+    if(!widget.controller.visible || !widget.interaction){
+      container = IgnorePointer(
+        child: container,
+      );
+    }
+
+    return container;
+    // return (widget.controller.visible) ? container : Container();
   }
 }
 
@@ -557,6 +603,19 @@ class UniversalWidgetController extends ChangeNotifier {
   _UniversalWidgetState _state;
   _UniversalWidgetState get state {
     return _state;
+  }
+
+  bool _isBuilt = false;
+  bool get isBuilt {
+    return _isBuilt;
+  }
+  _markWitgetWasBuilt() {
+    _isBuilt = true;
+    notifyListeners();
+  }
+  _markWitgetWasNotBuilt() {
+    _isBuilt = false;
+    notifyListeners();
   }
 
   UniversalWidget _widget;
@@ -576,6 +635,14 @@ class UniversalWidgetController extends ChangeNotifier {
   bool get mask => _mask;
   set mask(bool value){
     _mask = value;
+    _state?._isBuiltFirstTime = true;
+    notifyListeners();
+  }
+
+  bool _interaction = false;
+  bool get interaction => _interaction;
+  set interaction(bool value){
+    _interaction = value;
     _state?._isBuiltFirstTime = true;
     notifyListeners();
   }
@@ -626,6 +693,7 @@ class UniversalWidgetController extends ChangeNotifier {
   bool get visible => _visible;
   set visible(bool value) {
     _visible = value;
+    if(_visible == false) interaction = false;
     notifyListeners();
   }
 
@@ -746,6 +814,7 @@ class UniversalWidgetController extends ChangeNotifier {
     if(state != controller.state) return true;
     if(child != controller.child) return true;
     if(mask != controller.mask) return true;
+    if(interaction != controller.interaction) return true;
     if(width != controller.width) return true;
     if(height != controller.height) return true;
     if(scale != controller.scale) return true;
@@ -768,6 +837,7 @@ class UniversalWidgetController extends ChangeNotifier {
     _child = controller.child;
     _state = controller.state;
     _mask = controller.mask;
+    _interaction = controller.interaction;
     _x = controller.x;
     _y = controller.y;
     _width = controller.width;
@@ -806,6 +876,8 @@ class UniversalWidgetController extends ChangeNotifier {
     controller._color = color;
     controller._opacity = opacity;
     controller._visible = visible;
+    controller._mask = mask;
+    controller._interaction = interaction;
 
     controller._top = top;
     controller._bottom = bottom;
