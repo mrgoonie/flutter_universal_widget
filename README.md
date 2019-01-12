@@ -4,6 +4,8 @@ I'm just so excited to introduce to you my superhero widget: **UniversalWidget**
 
 You can find the package at: https://pub.dartlang.org/packages/universal_widget
 
+* Changelog: https://github.com/mrgoonie/flutter_universal_widget/blob/master/CHANGELOG.md
+
 ## Why?
 
 With **UniversalWidget**, you will have full control with it in the widget tree. 
