@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:universal_widget_example/universal_widget/universal_widget.dart';
+import 'package:universal_widget/universal_widget.dart';
 
 void main() => runApp(MyApp());
 
