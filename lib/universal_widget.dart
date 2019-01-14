@@ -14,11 +14,8 @@ import 'dart:typed_data';
 export 'package:universal_widget/tweener.dart';
 export 'package:universal_widget/universal_channel.dart';
 
-/// version 1.2.0
-/// Added `widget.reset()` to reset the `UniversalWidget` to the very first time it's created.
-/// Added `widget.onEnterFrame(callback, {int fps})` and `widget.stopEnterFrame()` (OMG, this one is so much fun!).
-/// Added `widget.toByte({pixelRatio})`, `widget.toImage({pixelRatio})`, `widget.toBase64({pixelRatio})` to capture the widget and convert it to image/base64/byte.
-/// Added `UniversalChannel` to communicate between `UniversalWidget`s (Full documentation & Examples will come later).
+/// version 1.2.1
+/// Fixed error: `A UniversalWidgetController was used after being disposed.`.
 
 /// Custom method callback with return any value
 typedef void ReturnVoidCallback({dynamic result});
@@ -563,9 +560,12 @@ class _UniversalWidgetState extends State<UniversalWidget> {
     }
 
     if(_controller != null){
-      _controller.removeListener(_widgetListener);
-      _controller.dispose();
-      _controller = null;
+      // try to dispose controller if it's still existed
+      try {
+        _controller.removeListener(_widgetListener);
+        _controller.dispose();
+        _controller = null;
+      } catch(err){}
     }
     
     if(_oldController != null){

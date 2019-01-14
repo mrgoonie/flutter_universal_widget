@@ -1,3 +1,7 @@
+## [1.2.1] - Fixed bug
+
+* Fixed error: `A UniversalWidgetController was used after being disposed.`.
+ 
 ## [1.2.0] - Big performance improvement, added `UniversalChannel` & a lot new features
 
 * Performance improved much better.
