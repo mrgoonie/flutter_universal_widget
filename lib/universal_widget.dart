@@ -14,7 +14,7 @@ import 'dart:typed_data';
 export 'package:universal_widget/tweener.dart';
 export 'package:universal_widget/universal_channel.dart';
 
-/// version 1.2.1
+/// version 1.2.2
 /// Fixed error: `A UniversalWidgetController was used after being disposed.`.
 
 /// Custom method callback with return any value
@@ -604,11 +604,13 @@ class _UniversalWidgetState extends State<UniversalWidget> {
     }
 
     if(_controller != null){
-      _controller._markWitgetWasBuilt();
-      if(_controller._forceRebuildCallback != null){
-        _controller._forceRebuildCallback();
-        _controller._forceRebuildCallback = null;
-      }
+      try {
+        _controller._markWitgetWasBuilt();
+        if(_controller._forceRebuildCallback != null){
+          _controller._forceRebuildCallback();
+          _controller._forceRebuildCallback = null;
+        }
+      } catch(err){}
     }
 
     if(widget.onWidgetBuilt != null) widget.onWidgetBuilt(widget);
