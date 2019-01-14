@@ -2,8 +2,8 @@ library universal_widget;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:universal_widget/tweener.dart';
-import 'package:universal_widget/universal_channel.dart';
+import 'package:universal_widget_example/universal_widget/tweener.dart';
+import 'package:universal_widget_example/universal_widget/universal_channel.dart';
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'dart:async';
@@ -11,8 +11,8 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 // export
-export 'package:universal_widget/tweener.dart';
-export 'package:universal_widget/universal_channel.dart';
+export 'package:universal_widget_example/universal_widget/tweener.dart';
+export 'package:universal_widget_example/universal_widget/universal_channel.dart';
 
 /// Fixed error: `A UniversalWidgetController was used after being disposed.`.
 
