@@ -14,7 +14,7 @@ import 'dart:typed_data';
 export 'package:universal_widget/tweener.dart';
 export 'package:universal_widget/universal_channel.dart';
 
-/// version 1.2.2
+/// version 1.2.3
 /// Fixed error: `A UniversalWidgetController was used after being disposed.`.
 
 /// Custom method callback with return any value
@@ -414,6 +414,8 @@ class _UniversalWidgetState extends State<UniversalWidget> {
   UniversalWidgetController _oldController = UniversalWidgetController();
   UniversalWidgetController _controller;
   UniversalChannel _channel;
+
+  bool _isControllerDisposed = false;
   
   String _parentRenderType;
   bool _isBuiltFirstTime = true;
@@ -435,6 +437,7 @@ class _UniversalWidgetState extends State<UniversalWidget> {
     
     if(widget._controller != oldWidget._controller){
       _controller = widget._controller ?? UniversalWidgetController();
+      _isControllerDisposed = false;
 
       _controller._widget = widget;
       _controller._timer = oldWidget._controller._timer;
@@ -465,8 +468,13 @@ class _UniversalWidgetState extends State<UniversalWidget> {
       _controller._left = (widget.left != oldWidget.left) ? widget.left : oldWidget._controller.left;
       _controller._right = (widget.right != oldWidget.right) ? widget.right : oldWidget._controller.right;
 
-      if(oldWidget._controller != null) oldWidget._controller.removeListener(_widgetListener);
-      oldWidget._controller.dispose();
+      if(oldWidget._controller != null && !oldWidget._controller.isDisposed){
+        try {
+          oldWidget._controller.removeListener(_widgetListener);
+          oldWidget._controller.dispose();
+        } catch(err){}
+      }
+
       _controller.addListener(_widgetListener);
     }
 
@@ -494,6 +502,7 @@ class _UniversalWidgetState extends State<UniversalWidget> {
     _parentRenderType = context.ancestorRenderObjectOfType(TypeMatcher<RenderObject>()).runtimeType.toString();
 
     _controller = widget._controller ?? UniversalWidgetController();
+    _isControllerDisposed = false;
 
     _controller._widget = widget;
     _controller._state = this;
@@ -559,7 +568,7 @@ class _UniversalWidgetState extends State<UniversalWidget> {
       _channel.dispose();
     }
 
-    if(_controller != null){
+    if(_controller != null && !_controller.isDisposed){
       // try to dispose controller if it's still existed
       try {
         _controller.removeListener(_widgetListener);
@@ -568,10 +577,12 @@ class _UniversalWidgetState extends State<UniversalWidget> {
       } catch(err){}
     }
     
-    if(_oldController != null){
+    if(_oldController != null && !_oldController.isDisposed){
       _oldController.dispose();
       _oldController = null;
     }
+
+    _isControllerDisposed = true;
     
     if(widget.name != null){
       // _trace("Disposed!");
@@ -589,12 +600,14 @@ class _UniversalWidgetState extends State<UniversalWidget> {
     // _trace("${_controller.mask}");
     if(context != null){
       _initSize = context.size;
-      if(_controller.mask){
-        _controller._width = _initSize.width;
-        _controller._height = _initSize.height;
-      } else {
-        _controller._width = widget.width;
-        _controller._height = widget.height;
+      if(_controller != null && !_controller.isDisposed){
+        if(_controller.mask){
+          _controller._width = _initSize.width;
+          _controller._height = _initSize.height;
+        } else {
+          _controller._width = widget.width;
+          _controller._height = widget.height;
+        }
       }
     }
 
@@ -603,7 +616,7 @@ class _UniversalWidgetState extends State<UniversalWidget> {
       // _trace("Built!");
     }
 
-    if(_controller != null){
+    if(_controller != null && !_controller.isDisposed){
       try {
         _controller._markWitgetWasBuilt();
         if(_controller._forceRebuildCallback != null){
@@ -753,6 +766,8 @@ class _UniversalWidgetState extends State<UniversalWidget> {
 }
 
 class UniversalWidgetController extends ChangeNotifier {
+  bool isDisposed = false;
+
   _UniversalWidgetState _state;
   _UniversalWidgetState get state {
     return _state;
@@ -984,6 +999,7 @@ class UniversalWidgetController extends ChangeNotifier {
   @override dispose(){
     // String widgetName = (_widget != null && _widget.name != null) ? _widget.name : "UniversalWidget<${_widget.hashCode}> (NO_NAME)";
     // print("[UniversalWidgetController] Controller of \"$widgetName\" has been disposed.");
+    isDisposed = true;
     killAllTweens();
     super.dispose();
   }

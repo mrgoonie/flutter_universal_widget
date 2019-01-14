@@ -1,4 +1,4 @@
-## [1.2.2] - Fixed bug
+## [1.2.3] - Fixed bug
 
 * Fixed error: `A UniversalWidgetController was used after being disposed.`.
  
