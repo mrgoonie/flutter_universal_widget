@@ -1,6 +1,6 @@
 name: universal_widget
 description: A universal widget that can be placed anywhere in your widget tree, with full support of animation & accessibility.
-version: 1.1.2
+version: 1.2.0
 author: Duy Nguyen <duynguyen@digitop.vn>
 homepage: https://github.com/mrgoonie/flutter_universal_widget
 

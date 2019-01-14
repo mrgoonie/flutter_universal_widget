@@ -1,3 +1,12 @@
+## [1.2.0] - Big performance improvement, added `UniversalChannel` & a lot new features
+
+* Performance improved much better.
+* Added `widget.reset()` to reset the `UniversalWidget` to the very first time it's created.
+* Added `widget.onEnterFrame(callback, {int fps})` and `widget.stopEnterFrame()` (OMG, this one is so much fun!).
+* Added `widget.toByte({pixelRatio})`, `widget.toImage({pixelRatio})`, `widget.toBase64({pixelRatio})` to capture the widget and convert it to image/base64/byte.
+* Added `UniversalChannel` to communicate between `UniversalWidget`s **(Full documentation & Examples will come later)**.
+* Fixed some minor bugs.
+
 ## [1.1.2] - More features & fixed bugs.
 
 * Changed `onWidgetBuilt(BuildContext)` to `onWidgetBuild(UniversalWitget)`.

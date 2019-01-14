@@ -1,20 +1,24 @@
 library universal_widget;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:universal_widget/tweener.dart';
+import 'package:universal_widget/universal_channel.dart';
 import 'dart:math' as math;
+import 'dart:ui' as ui;
+import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 // export
 export 'package:universal_widget/tweener.dart';
+export 'package:universal_widget/universal_channel.dart';
 
-// version 1.1.2
-// Changed `onWidgetBuilt(BuildContext)` to `onWidgetBuild(UniversalWitget)`.
-// Added `onWidgetUpdated(UniversalWidget)`.
-// Added `override (bool)` to `update()` method, default value is `true`, so you can do multiple `update()` animation at the sametime. 
-// Added `stopAnimation()` method in case you want to stop all animations of the widget.
-// Added `interaction` properties to enable/disable interactivity of the widget.
-// Fixed losing state issue (when update widget while state hasn't been created).
-// Fixed some minor bugs.
+/// version 1.2.0
+/// Added `widget.reset()` to reset the `UniversalWidget` to the very first time it's created.
+/// Added `widget.onEnterFrame(callback, {int fps})` and `widget.stopEnterFrame()` (OMG, this one is so much fun!).
+/// Added `widget.toByte({pixelRatio})`, `widget.toImage({pixelRatio})`, `widget.toBase64({pixelRatio})` to capture the widget and convert it to image/base64/byte.
+/// Added `UniversalChannel` to communicate between `UniversalWidget`s (Full documentation & Examples will come later).
 
 /// Custom method callback with return any value
 typedef void ReturnVoidCallback({dynamic result});
@@ -23,9 +27,9 @@ class UniversalWidget extends StatefulWidget {
   /// Create a new UniversalWidget
   UniversalWidget({
     Key key, 
-    UniversalWidgetController controller,
     this.name,
     this.child,
+    // display properties
     this.x = 0.0,
     this.y = 0.0,
     this.width,
@@ -58,16 +62,29 @@ class UniversalWidget extends StatefulWidget {
     this.onWidgetDisposed,
     // button mode
     this.onPressed,
-  }) : controller = controller ?? UniversalWidgetController(),
+    // channel data
+    // this.extra,
+    Map<String, dynamic> extra,
+    UniversalChannel channel,
+    List<UniversalChannel> listenedChannels,
+  }) : 
+    _controller = UniversalWidgetController(),
     transformOrigin = transformOrigin ?? Offset(0.5, 0.5),
     scale = scale ?? Offset(1,1),
     margin = margin ?? EdgeInsets.zero,
     padding = padding ?? EdgeInsets.zero,
+    extra = extra ?? {},
+    _channel = channel,
     super(key: key);
+
+  @override
+  StatefulElement createElement() {
+    return super.createElement();
+  }
 
   final String name;
   final Widget child;
-  final UniversalWidgetController controller;
+  final UniversalWidgetController _controller;
 
   final double x, y, width, height, rotation, opacity, top, bottom, left, right;
   final Color color;
@@ -78,6 +95,20 @@ class UniversalWidget extends StatefulWidget {
   final BorderRadius borderRadius;
   final List<BoxShadow> boxShadow;
   final Alignment alignment;
+
+  // UniversalChannel
+  final UniversalChannel _channel;
+  UniversalChannel get channel {
+    if(state != null && state._channel != null){
+      return state._channel;
+    } else if(_channel != null){
+      return _channel;
+    } else {
+      return UniversalChannel(widget: this);
+    }
+  }
+  // dirty `extra` to store variables
+  final Map<String, dynamic> extra;
 
   final bool animateWhenUpdate;
   final double durationWhenUpdate;
@@ -95,6 +126,32 @@ class UniversalWidget extends StatefulWidget {
   /// Callback method to listen for pressing (tapping) event
   final ValueChanged<UniversalWidget> onPressed;
 
+  /// Reset the widget to the original state.
+  void reset(){
+    update(
+      x: x, y: y, top: top, left: left, right: right, bottom: bottom,
+      opacity: opacity, rotation: rotation, scale: scale,
+      visible: visible, interaction: interaction, mask: mask,
+      width: width, height: height, margin: margin, padding: padding,
+      color: color, border: border, borderRadius: borderRadius, boxShadow: boxShadow
+    );
+  }
+
+  /// Create a repeated method with given FPS (default: 60 fps).
+  void onEnterFrame(ValueChanged<UniversalWidget> callback, {int fps = 60}){
+    if(_controller._timer != null) _controller._timer.cancel();
+    int miliseconds = (1000 ~/ fps);
+    _controller._timer = Timer.periodic(Duration(milliseconds: miliseconds), (timer){
+      callback(this);
+    });
+  }
+
+  /// Delete/kill a current repeated method.
+  void deleteEnterFrame(){
+    if(_controller._timer != null) _controller._timer.cancel();
+    _controller._timer = null;
+  }
+
   /// Stop all current animations of the widget. (Same function with `killAllTweens()`)
   void stopAnimation(){
     killAllTweens();
@@ -102,7 +159,7 @@ class UniversalWidget extends StatefulWidget {
 
   /// Stop the current animation of the widget. (Same function with `stopAnimation()`)
   void killAllTweens(){
-    if(controller!= null) controller.killAllTweens();
+    if(_controller!= null) _controller.killAllTweens();
   }
   
   /// Updates the properties of the widget, with animation options.
@@ -115,6 +172,7 @@ class UniversalWidget extends StatefulWidget {
     BorderRadius borderRadius,
     List<BoxShadow> boxShadow,
     bool visible,
+    bool interaction,
     bool mask,
     Widget child,
     // animation options
@@ -129,22 +187,23 @@ class UniversalWidget extends StatefulWidget {
   }){
     
     processUpdating(){
-      if(!override || duration == null) controller.killAllTweens();
+      if(!override || duration == null) _controller.killAllTweens();
 
       if(child != null){
-        controller.child = child;
+        _controller.child = child;
       }
 
-      if(mask != null && mask != controller.mask) controller.mask = mask;
-
+      if(mask != null && mask != _controller.mask) _controller.mask = mask;
+      
       if(animateWhenUpdate || duration != null){
         // print("${controller.width} x ${controller.height}");
-        if(width != null && controller.width == null) controller._width = controller._state._initSize.width;
-        if(height != null && controller.height == null) controller._height = controller._state._initSize.height;
+        if(width != null && _controller.width == null) _controller._width = _controller._state._initSize.width;
+        if(height != null && _controller.height == null) _controller._height = _controller._state._initSize.height;
 
-        if(visible != null) controller.visible = visible;
-
-        Tweener.to(controller, duration ?? durationWhenUpdate, 
+        if(visible != null) _controller.visible = visible;
+        if(interaction != null) _controller.interaction = interaction;
+        
+        Tweener.to(_controller, duration ?? durationWhenUpdate, 
           x: x,
           y: y,
           width: width,
@@ -171,38 +230,40 @@ class UniversalWidget extends StatefulWidget {
           onComplete: onComplete,
         );
       } else {
-        if(x != null) controller.x = x + .0;
-        if(y != null) controller.y = y + .0;
-        if(width != null) controller.width = width + .0;
-        if(height != null) controller.height = height + .0;
-        if(rotation != null) controller.rotation = rotation + .0;
-        if(opacity != null) controller.opacity = opacity + .0;
-        if(color != null) controller.color = color;
-        if(border != null) controller.border = border;
-        if(borderRadius != null) controller.borderRadius = borderRadius;
-        if(transformOrigin != null) controller.transformOrigin = transformOrigin;
-        if(scale != null) controller.scale = scale;
-        if(margin != null) controller.margin = margin;
-        if(padding != null) controller.padding = padding;
-        if(visible != null) controller.visible = visible;
-        if(boxShadow != null) controller.boxShadow = boxShadow;
+        if(x != null) _controller.x = x + .0;
+        if(y != null) _controller.y = y + .0;
+        if(width != null) _controller.width = width + .0;
+        if(height != null) _controller.height = height + .0;
+        if(rotation != null) _controller.rotation = rotation + .0;
+        if(opacity != null) _controller.opacity = opacity + .0;
+        if(color != null) _controller.color = color;
+        if(border != null) _controller.border = border;
+        if(borderRadius != null) _controller.borderRadius = borderRadius;
+        if(transformOrigin != null) _controller.transformOrigin = transformOrigin;
+        if(scale != null) _controller.scale = scale;
+        if(margin != null) _controller.margin = margin;
+        if(padding != null) _controller.padding = padding;
+        if(boxShadow != null) _controller.boxShadow = boxShadow;
 
-        if(top != null) controller.top = top + .0;
-        if(bottom != null) controller.bottom = bottom + .0;
-        if(left != null) controller.left = left + .0;
-        if(right != null) controller.right = right + .0;
+        if(visible != null) _controller.visible = visible;
+        if(interaction != null) _controller.interaction = interaction;
+
+        if(top != null) _controller.top = top + .0;
+        if(bottom != null) _controller.bottom = bottom + .0;
+        if(left != null) _controller.left = left + .0;
+        if(right != null) _controller.right = right + .0;
       }
     }
 
     void buildListener(){
-      if(controller.state != null){
-        controller.removeListener(buildListener);
+      if(_controller.state != null){
+        _controller.removeListener(buildListener);
         processUpdating();
       }
     }
 
-    if(controller.state == null){
-      controller.addListener(buildListener);
+    if(_controller.state == null){
+      _controller.addListener(buildListener);
     } else {
       processUpdating();
     }
@@ -210,7 +271,7 @@ class UniversalWidget extends StatefulWidget {
 
   /// Get access to widget properties
   UniversalWidgetController get(){
-    return controller;
+    return _controller;
   }
 
   /// Check whether this widget has different properties with another widget
@@ -239,14 +300,14 @@ class UniversalWidget extends StatefulWidget {
   /// Get size of the widget (return `Size.zero` if the widget has been built yet).
   Size get size {
     Size _size = (state != null && state.context != null) ? state.context.size : Size(0,0);
-    double horizontal = (controller.margin != null) ? controller.margin.horizontal : 0;
-    double vertical = (controller.margin != null) ? controller.margin.vertical : 0;
+    double horizontal = (_controller.margin != null) ? _controller.margin.horizontal : 0;
+    double vertical = (_controller.margin != null) ? _controller.margin.vertical : 0;
     return Size(_size.width - horizontal, _size.height - vertical);
   }
 
   /// Get original size of the widget, after the widget was build the first time.
   Size get originalSize {
-    return controller.state.initSize;
+    return _controller.state.initSize;
   }
 
   /// Get widget position on the screen.
@@ -254,8 +315,45 @@ class UniversalWidget extends StatefulWidget {
     return (state != null && state.context != null) ? (state.context.findRenderObject() as RenderBox).localToGlobal(Offset.zero) : Offset(0, 0);
   }
 
+  /// Convert widget to [ByteData].
+  Future<ByteData> _toByte({double pixelRatio: 3.0}) async {
+    RenderRepaintBoundary boundary = state.context.findRenderObject();
+    ui.Image image = await boundary.toImage(pixelRatio: pixelRatio);
+    ByteData byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+    // if(_controller != null) _controller.shouldCaptureWidget = false;
+    return byteData;
+  }
+
+  /// Convert widget to [Image].
+  void toImage({double pixelRatio: 3.0, ValueChanged<Image> onComplete}) async {
+    // ByteData byteData = await toByte(pixelRatio: pixelRatio);
+    if(_controller == null) return;
+    _controller.captureWidget(onComplete: (byteData){
+      Uint8List pngBytes = byteData.buffer.asUint8List();
+      Image finalImage = Image.memory(pngBytes);
+      if(onComplete != null) onComplete(finalImage);
+    });
+    // return finalImage;
+  }
+
+  /// Convert widget to Base64 [String].
+  void toBase64({double pixelRatio: 3.0, ValueChanged<String> onComplete}) async {
+    if(_controller == null) return;
+    // ByteData byteData = await toByte(pixelRatio: pixelRatio);
+    _controller.captureWidget(onComplete: (byteData){
+      Uint8List pngBytes = byteData.buffer.asUint8List();
+      String base64 = base64Encode(pngBytes);
+      if(onComplete != null) onComplete(base64);
+    });
+    // return base64;
+  }
+
   /// Get state of the widget.
-  _UniversalWidgetState get state => controller.state;
+  _UniversalWidgetState get state => _controller.state;
+
+  // ==========================================
+  //                  STATICS
+  // ==========================================
 
   static List<UniversalWidget> _list = [];
   
@@ -317,9 +415,10 @@ class UniversalWidget extends StatefulWidget {
 class _UniversalWidgetState extends State<UniversalWidget> {
 
   UniversalWidgetController _oldController = UniversalWidgetController();
+  UniversalWidgetController _controller;
+  UniversalChannel _channel;
   
   String _parentRenderType;
-  bool _canChangePosition = false;
   bool _isBuiltFirstTime = true;
 
   Size _initSize = Size.zero;
@@ -329,40 +428,52 @@ class _UniversalWidgetState extends State<UniversalWidget> {
   void didUpdateWidget(UniversalWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // UniversalWidget.wipeOut(); // clear the memory
-    widget.controller._state = this;
-    
-    if(widget.controller != oldWidget.controller){
-      widget.controller._widget = widget;
-
-      widget.controller._mask = (widget.mask != oldWidget.mask) ? widget.mask : oldWidget.controller.mask;
-      widget.controller._child = (widget.child != oldWidget.child) ? widget.child : oldWidget.controller.child;
-      
-      widget.controller._x = (widget.x != oldWidget.x) ? widget.x : oldWidget.controller.x;
-      widget.controller._y = (widget.y != oldWidget.y) ? widget.y : oldWidget.controller.y;
-      widget.controller._width = (widget.width != oldWidget.width) ? widget.width : oldWidget.controller.width;
-      widget.controller._height = (widget.height != oldWidget.height) ? widget.height : oldWidget.controller.height;
-      widget.controller._scale = (widget.scale != oldWidget.scale) ? widget.scale : oldWidget.controller.scale;
-      widget.controller._rotation = (widget.rotation != oldWidget.rotation) ? widget.rotation : oldWidget.controller.rotation;
-      widget.controller._border = (widget.border != oldWidget.border) ? widget.border : oldWidget.controller.border;
-      widget.controller._borderRadius = (widget.borderRadius != oldWidget.borderRadius) ? widget.borderRadius : oldWidget.controller.borderRadius;
-      widget.controller._transformOrigin = (widget.transformOrigin != oldWidget.transformOrigin) ? widget.transformOrigin : oldWidget.controller.transformOrigin;
-      widget.controller._opacity = (widget.opacity != oldWidget.opacity) ? widget.opacity : oldWidget.controller.opacity;
-      widget.controller._visible = (widget.visible != oldWidget.visible) ? widget.visible : oldWidget.controller.visible;
-      widget.controller._interaction = (widget.interaction != oldWidget.interaction) ? widget.interaction : oldWidget.controller.interaction;
-      widget.controller._color = (widget.color != oldWidget.color) ? widget.color : oldWidget.controller.color;
-      widget.controller._margin = (widget.margin != oldWidget.margin) ? widget.margin : oldWidget.controller.margin;
-      widget.controller._padding = (widget.padding != oldWidget.padding) ? widget.padding : oldWidget.controller.padding;
-      widget.controller._boxShadow = (widget.boxShadow != oldWidget.boxShadow) ? widget.boxShadow : oldWidget.controller.boxShadow;
-      
-      widget.controller._top = (widget.top != oldWidget.top) ? widget.top : oldWidget.controller.top;
-      widget.controller._bottom = (widget.bottom != oldWidget.bottom) ? widget.bottom : oldWidget.controller.bottom;
-      widget.controller._left = (widget.left != oldWidget.left) ? widget.left : oldWidget.controller.left;
-      widget.controller._right = (widget.right != oldWidget.right) ? widget.right : oldWidget.controller.right;
-
-      if(oldWidget.controller != null) oldWidget.controller.removeListener(_widgetListener);
-      widget.controller.addListener(_widgetListener);
+    if(widget.channel != oldWidget.channel){
+      // print("update widget channel: ${widget._channel.hashCode} -> ${oldWidget._channel.hashCode}");
+      oldWidget.channel.removeChannelListener(widget, _onChannelNotified);
+      oldWidget.channel.dispose();
+      _channel = widget.channel;
+      _channel.addChannelListener(widget, _onChannelNotified);
     }
+    
+    if(widget._controller != oldWidget._controller){
+      _controller = widget._controller ?? UniversalWidgetController();
+
+      _controller._widget = widget;
+      _controller._timer = oldWidget._controller._timer;
+
+      _controller._mask = (widget.mask != oldWidget.mask) ? widget.mask : oldWidget._controller.mask;
+      _controller._child = (widget.child != oldWidget.child) ? widget.child : oldWidget._controller.child;
+      
+      _controller._x = (widget.x != oldWidget.x) ? widget.x : oldWidget._controller.x;
+      _controller._y = (widget.y != oldWidget.y) ? widget.y : oldWidget._controller.y;
+      _controller._width = (widget.width != oldWidget.width) ? widget.width : oldWidget._controller.width;
+      _controller._height = (widget.height != oldWidget.height) ? widget.height : oldWidget._controller.height;
+      _controller._scale = (widget.scale != oldWidget.scale) ? widget.scale : oldWidget._controller.scale;
+      _controller._rotation = (widget.rotation != oldWidget.rotation) ? widget.rotation : oldWidget._controller.rotation;
+      _controller._border = (widget.border != oldWidget.border) ? widget.border : oldWidget._controller.border;
+      _controller._borderRadius = (widget.borderRadius != oldWidget.borderRadius) ? widget.borderRadius : oldWidget._controller.borderRadius;
+      _controller._transformOrigin = (widget.transformOrigin != oldWidget.transformOrigin) ? widget.transformOrigin : oldWidget._controller.transformOrigin;
+      _controller._opacity = (widget.opacity != oldWidget.opacity) ? widget.opacity : oldWidget._controller.opacity;
+      _controller._color = (widget.color != oldWidget.color) ? widget.color : oldWidget._controller.color;
+      _controller._margin = (widget.margin != oldWidget.margin) ? widget.margin : oldWidget._controller.margin;
+      _controller._padding = (widget.padding != oldWidget.padding) ? widget.padding : oldWidget._controller.padding;
+      _controller._boxShadow = (widget.boxShadow != oldWidget.boxShadow) ? widget.boxShadow : oldWidget._controller.boxShadow;
+      
+      _controller._visible = (widget.visible != oldWidget.visible) ? widget.visible : oldWidget._controller.visible;
+      _controller._interaction = (widget.interaction != oldWidget.interaction) ? widget.interaction : oldWidget._controller.interaction;
+      
+      _controller._top = (widget.top != oldWidget.top) ? widget.top : oldWidget._controller.top;
+      _controller._bottom = (widget.bottom != oldWidget.bottom) ? widget.bottom : oldWidget._controller.bottom;
+      _controller._left = (widget.left != oldWidget.left) ? widget.left : oldWidget._controller.left;
+      _controller._right = (widget.right != oldWidget.right) ? widget.right : oldWidget._controller.right;
+
+      if(oldWidget._controller != null) oldWidget._controller.removeListener(_widgetListener);
+      oldWidget._controller.dispose();
+      _controller.addListener(_widgetListener);
+    }
+
+    _controller._state = this;
     
     if(widget.name != null){
       // print("$widget<${widget.name}> was updated!");
@@ -370,8 +481,6 @@ class _UniversalWidgetState extends State<UniversalWidget> {
     }
 
     _parentRenderType = context.ancestorRenderObjectOfType(TypeMatcher<RenderObject>()).runtimeType.toString();
-    _canChangePosition = (_parentRenderType == "RenderStack");
-
     _isBuiltFirstTime = true;
 
     if(widget.onWidgetUpdated != null){
@@ -386,37 +495,44 @@ class _UniversalWidgetState extends State<UniversalWidget> {
     _isBuiltFirstTime = true;
 
     _parentRenderType = context.ancestorRenderObjectOfType(TypeMatcher<RenderObject>()).runtimeType.toString();
-    // print("_parentRenderType = $_parentRenderType");
-    _canChangePosition = (_parentRenderType == "RenderStack");
 
-    widget.controller._widget = widget;
-    widget.controller._state = this;
-    widget.controller._child = widget.child;
-    widget.controller._mask = widget.mask;
+    _controller = widget._controller ?? UniversalWidgetController();
+
+    _controller._widget = widget;
+    _controller._state = this;
+    _controller._child = widget.child;
+    _controller._mask = widget.mask;
     
-    widget.controller.x = widget.x;
-    widget.controller.y = widget.y;
-    widget.controller.width = widget.width;
-    widget.controller.height = widget.height;
-    widget.controller.color = widget.color;
-    widget.controller.scale = widget.scale;
-    widget.controller.rotation = widget.rotation;
-    widget.controller.border = widget.border;
-    widget.controller.borderRadius = widget.borderRadius;
-    widget.controller.transformOrigin = widget.transformOrigin;
-    widget.controller.opacity = widget.opacity;
-    widget.controller.visible = widget.visible;
-    widget.controller.interaction = widget.interaction;
-    widget.controller.margin = widget.margin;
-    widget.controller.padding = widget.padding;
-    widget.controller.boxShadow = widget.boxShadow;
+    _controller.x = widget.x;
+    _controller.y = widget.y;
+    _controller.width = widget.width;
+    _controller.height = widget.height;
+    _controller.color = widget.color;
+    _controller.scale = widget.scale;
+    _controller.rotation = widget.rotation;
+    _controller.border = widget.border;
+    _controller.borderRadius = widget.borderRadius;
+    _controller.transformOrigin = widget.transformOrigin;
+    _controller.opacity = widget.opacity;
+    _controller.visible = widget.visible;
+    _controller.interaction = widget.interaction;
+    _controller.margin = widget.margin;
+    _controller.padding = widget.padding;
+    _controller.boxShadow = widget.boxShadow;
 
-    widget.controller.top = widget.top;
-    widget.controller.bottom = widget.bottom;
-    widget.controller.left = widget.left;
-    widget.controller.right = widget.right;
+    _controller.top = widget.top;
+    _controller.bottom = widget.bottom;
+    _controller.left = widget.left;
+    _controller.right = widget.right;
 
-    widget.controller.addListener(_widgetListener);
+    _controller.addListener(_widgetListener);
+
+    // channel
+    // _channel = (widget._channel != null) ? widget._channel : UniversalChannel(widget: widget);
+    _channel = widget.channel;
+    _channel.addChannelListener(widget, _onChannelNotified);
+
+    // print(_channel);
 
     if(widget.onWidgetUpdated != null) widget.onWidgetUpdated(widget);
     if(widget.onWidgetInit != null) widget.onWidgetInit();
@@ -424,52 +540,62 @@ class _UniversalWidgetState extends State<UniversalWidget> {
     // _trace("Initialized!");
   }
 
+  _onChannelNotified(){
+    // print("Channel updated!");
+    if(mounted) setState((){});
+  }
+
   _widgetListener(){
     // rebuild the widget:
     if(mounted) setState((){});
 
-    _oldController.copyFrom(widget.controller);
+    _oldController.copyFrom(_controller);
   }
 
   @override
   void dispose() {
     super.dispose();
 
-    // widget.controller._forceRebuildWidget = true;
+    // unsubscribe channel
+    _channel.removeChannelListener(widget, _onChannelNotified);
+    if(_channel.name == "UniversalChannel<${widget.hashCode}>"){
+      _channel.dispose();
+    }
 
-    if(widget.controller != null){
-      widget.controller.removeListener(_widgetListener);
-      // widget.controller.dispose();
+    if(_controller != null){
+      _controller.removeListener(_widgetListener);
+      _controller.dispose();
+      _controller = null;
     }
     
-    if(_oldController != null) _oldController.dispose();
+    if(_oldController != null){
+      _oldController.dispose();
+      _oldController = null;
+    }
     
     if(widget.name != null){
       // _trace("Disposed!");
       UniversalWidget.remove(widget.name);
     }
-
-    widget.controller._markWitgetWasNotBuilt();
-
+    
     if(widget.onWidgetDisposed != null) widget.onWidgetDisposed(widget);
   }
 
-  /* _trace(String msg){
+  _trace(String msg){
     if(widget.name != null) print("UniversalWidget<${widget.name}>: $msg");
-  } */
+  }
 
   Future<void> _executeAfterFirstBuild() async {
-    // _trace("${widget.controller.mask}");
+    // _trace("${_controller.mask}");
     if(context != null){
       _initSize = context.size;
-      if(widget.controller.mask){
-        widget.controller._width = _initSize.width;
-        widget.controller._height = _initSize.height;
+      if(_controller.mask){
+        _controller._width = _initSize.width;
+        _controller._height = _initSize.height;
       } else {
-        widget.controller._width = widget.width;
-        widget.controller._height = widget.height;
+        _controller._width = widget.width;
+        _controller._height = widget.height;
       }
-      if(widget.onWidgetBuilt != null) widget.onWidgetBuilt(widget);
     }
 
     if(widget.name != null){
@@ -477,105 +603,113 @@ class _UniversalWidgetState extends State<UniversalWidget> {
       // _trace("Built!");
     }
 
-    widget.controller._markWitgetWasBuilt();
+    if(_controller != null){
+      _controller._markWitgetWasBuilt();
+      if(_controller._forceRebuildCallback != null){
+        _controller._forceRebuildCallback();
+        _controller._forceRebuildCallback = null;
+      }
+    }
+
+    if(widget.onWidgetBuilt != null) widget.onWidgetBuilt(widget);
   }
 
   @override
   Widget build(BuildContext context) {
-    widget.controller._state = this; // update state
+    // _trace("Built!");
 
-    if(_isBuiltFirstTime || (widget.controller.mask != _oldController.mask) || (widget.controller.child != _oldController.child) || widget.controller._forceRebuildWidget){
+    if(_controller == null) return SizedBox();
+
+    _controller._state = this; // update state
+
+    if(_isBuiltFirstTime || (_controller.mask != _oldController.mask) || (_controller.child != _oldController.child) || _controller._forceRebuildWidget){
       _isBuiltFirstTime = false;
-      widget.controller._forceRebuildWidget = false;
+      _controller._forceRebuildWidget = false;
       WidgetsBinding.instance.addPostFrameCallback((_) => _executeAfterFirstBuild());
     }
 
     Widget container;
-    Widget child = widget.controller.child;
+    Widget child;
     AlignmentGeometry align = widget.alignment;
+
+    if(_controller.child is Builder){
+      child = (_controller.child as Builder).build(context);
+    } else {
+      child = _controller.child;
+    }
+    // if(_controller.child is UniversalBuilder){
+    //   child = (_controller.child as UniversalBuilder).build(context);
+    // }
 
     bool shouldApplyTransformMatrix = false;
 
-    if(widget.controller.rotation != 0 || (widget.controller.rotation == 0 && _oldController.rotation != 0))
+    if(_controller.rotation != 0 || (_controller.rotation == 0 && _oldController.rotation != 0))
     {
       shouldApplyTransformMatrix = true;
     }
 
-    if(widget.controller.x != 0 || (widget.controller.x == 0 && _oldController.x != 0)){
+    if(_controller.x != 0 || (_controller.x == 0 && _oldController.x != 0)){
       shouldApplyTransformMatrix = true;
     }
 
-    if(widget.controller.y != 0 || (widget.controller.y == 0 && _oldController.y != 0)){
+    if(_controller.y != 0 || (_controller.y == 0 && _oldController.y != 0)){
       shouldApplyTransformMatrix = true;
     }
 
-    if(widget.controller.scale.dx != 1 || (widget.controller.scale.dx == 1 && _oldController.scale.dx != 1)){
+    if(_controller.scale.dx != 1 || (_controller.scale.dx == 1 && _oldController.scale.dx != 1)){
       shouldApplyTransformMatrix = true;
     }
 
-    if(widget.controller.scale.dy != 1 || (widget.controller.scale.dy == 1 && _oldController.scale.dy != 1)){
+    if(_controller.scale.dy != 1 || (_controller.scale.dy == 1 && _oldController.scale.dy != 1)){
       shouldApplyTransformMatrix = true;
     }
     
-    if(widget.controller.mask){
+    if(_controller.mask){
       child = ClipRRect(
-        borderRadius: widget.controller.borderRadius ?? BorderRadius.all(Radius.circular(0)),
+        borderRadius: _controller.borderRadius ?? BorderRadius.all(Radius.circular(0)),
         child: child,
       );
     }
 
     container = Container(
-      width: widget.controller.width,
-      height: widget.controller.height,
+      width: _controller.width,
+      height: _controller.height,
       // spacing
-      padding: widget.controller.padding,
-      margin: widget.controller.margin,
+      padding: _controller.padding,
+      margin: _controller.margin,
       // box decoration
       decoration: BoxDecoration(
-        color: widget.controller.color,
-        border: widget.controller.border,
-        borderRadius: widget.controller.borderRadius,
-        boxShadow: widget.controller.boxShadow,
+        color: _controller.color,
+        border: _controller.border,
+        borderRadius: _controller.borderRadius,
+        boxShadow: _controller.boxShadow,
         // image: data.backgroundImage
       ),
       child: child
     );
 
     if(shouldApplyTransformMatrix){
-      align = FractionalOffset(widget.controller.transformOrigin.dx, widget.controller.transformOrigin.dy);
+      align = FractionalOffset(_controller.transformOrigin.dx, _controller.transformOrigin.dy);
       container = Transform(
         alignment: align,
         transform: Matrix4.identity()
-          ..translate(widget.controller.x, widget.controller.y)
-          ..rotateZ((widget.controller.rotation) * math.pi / 180)
-          ..scale(widget.controller.scale.dx, widget.controller.scale.dy),
+          ..translate(_controller.x, _controller.y)
+          ..rotateZ((_controller.rotation) * math.pi / 180)
+          ..scale(_controller.scale.dx, _controller.scale.dy),
         child: container,
       );
-    }
-
-    if(_canChangePosition){
-      // print("${widget.name}: ${widget.controller.top} / ${widget.controller.left} / ${widget.controller.right} / ${widget.controller.bottom}");
-      if(widget.controller.top != null || widget.controller.left != null || widget.controller.right != null || widget.controller.bottom != null){
-        container = Positioned(
-          top: widget.controller.top,
-          left: widget.controller.left,
-          right: widget.controller.right,
-          bottom: widget.controller.bottom,
-          child: container
-        );
-      }
     }
 
     if(widget.onPressed != null){
       container = GestureDetector(
-        onTap: () => widget.onPressed(widget.controller.widget),
+        onTap: () => widget.onPressed(_controller.widget),
         child: container,
       );
     }
 
-    double newOpacity = widget.controller.opacity;
+    double newOpacity = _controller.opacity;
 
-    if(!widget.controller.visible){
+    if(!_controller.visible){
       newOpacity = 0.0;
     }
 
@@ -590,14 +724,29 @@ class _UniversalWidgetState extends State<UniversalWidget> {
       );
     }
 
-    if(!widget.controller.visible || !widget.interaction){
-      container = IgnorePointer(
-        child: container,
-      );
+    if(!_controller.visible || !widget.interaction){
+      container = IgnorePointer(child: container);
+    }
+    
+    // container = RepaintBoundary(child: container);
+    // _trace(_controller.shouldCaptureWidget.toString());
+    if(_controller.shouldCaptureWidget){
+      container = RepaintBoundary(child: container);
+    }
+
+    if(_parentRenderType == "RenderStack"){
+      if(_controller.top != null || _controller.left != null || _controller.right != null || _controller.bottom != null){
+        container = Positioned(
+          top: _controller.top,
+          left: _controller.left,
+          right: _controller.right,
+          bottom: _controller.bottom,
+          child: container
+        );
+      }
     }
 
     return container;
-    // return (widget.controller.visible) ? container : Container();
   }
 }
 
@@ -607,6 +756,8 @@ class UniversalWidgetController extends ChangeNotifier {
     return _state;
   }
 
+  Timer _timer;
+
   bool _isBuilt = false;
   bool get isBuilt {
     return _isBuilt;
@@ -615,10 +766,10 @@ class UniversalWidgetController extends ChangeNotifier {
     _isBuilt = true;
     notifyListeners();
   }
-  _markWitgetWasNotBuilt() {
-    _isBuilt = false;
-    notifyListeners();
-  }
+  // _markWitgetWasDisposed() {
+  //   _isBuilt = false;
+  //   notifyListeners();
+  // }
 
   UniversalWidget _widget;
   UniversalWidget get widget => _widget;
@@ -631,13 +782,36 @@ class UniversalWidgetController extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool _shouldCaptureWidget = false;
+  bool get shouldCaptureWidget => _shouldCaptureWidget;
+  set shouldCaptureWidget(bool value){
+    _shouldCaptureWidget = value;
+    notifyListeners();
+  }
+
+  void captureWidget({ValueChanged<ByteData> onComplete}) async {
+    shouldCaptureWidget = true;
+    forceRebuildWidget(onComplete: () async {
+      ByteData byte = await widget._toByte();
+      shouldCaptureWidget = false;
+      if(onComplete != null) onComplete(byte);
+    });
+  }
+
   bool _forceRebuildWidget = false;
+  VoidCallback _forceRebuildCallback;
+  void forceRebuildWidget({VoidCallback onComplete}){
+    if(onComplete != null) _forceRebuildCallback = onComplete;
+    _forceRebuildWidget = true;
+    notifyListeners();
+  }
 
   bool _mask = false;
   bool get mask => _mask;
   set mask(bool value){
     _mask = value;
-    _state?._isBuiltFirstTime = true;
+    // _state?._isBuiltFirstTime = true;
+    forceRebuildWidget();
     notifyListeners();
   }
 
@@ -806,6 +980,8 @@ class UniversalWidgetController extends ChangeNotifier {
   }
 
   @override dispose(){
+    // String widgetName = (_widget != null && _widget.name != null) ? _widget.name : "UniversalWidget<${_widget.hashCode}> (NO_NAME)";
+    // print("[UniversalWidgetController] Controller of \"$widgetName\" has been disposed.");
     killAllTweens();
     super.dispose();
   }
@@ -890,5 +1066,35 @@ class UniversalWidgetController extends ChangeNotifier {
 
     return controller;
   }
+}
 
+typedef UniversalWidgetBuilder = Widget Function(UniversalChannel channel, BuildContext context);
+class UniversalBuilder extends StatelessWidget {
+  /// Creates a widget that delegates its build to a callback.
+  ///
+  /// The [builder] argument must not be null.
+  const UniversalBuilder({
+    Key key,
+    // @required this.channel,
+    @required this.builder
+  }) : assert(builder != null),
+       super(key: key);
+
+  /// Called to obtain the child widget.
+  ///
+  /// This function is called whenever this widget is included in its parent's
+  /// build and the old widget (if any) that it synchronizes with has a distinct
+  /// object identity. Typically the parent's build method will construct
+  /// a new tree of widgets and so a new Builder child will not be [identical]
+  /// to the corresponding old one.
+  final UniversalWidgetBuilder builder;
+
+  // final UniversalChannel channel;
+
+  @override
+  Widget build(BuildContext context){
+    _UniversalWidgetState parentState = context.ancestorStateOfType(TypeMatcher<_UniversalWidgetState>());
+    UniversalChannel channel = parentState.widget.channel;
+    return builder(channel, context);
+  }
 }
