@@ -1,5 +1,9 @@
 ## [1.2.4] - Fixed bug
 
+* Fixed bug of not tweening the `rotation` attribute.
+
+## [1.2.4] - Fixed bug
+
 * Fixed error: `A UniversalWidgetController was used after being disposed.`.
  
 ## [1.2.0] - Big performance improvement, added `UniversalChannel` & a lot new features
