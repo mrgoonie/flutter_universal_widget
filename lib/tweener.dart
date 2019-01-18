@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:universal_widget/universal_widget.dart';
 
-// version 0.1.7
+// version 0.1.8
 
 /// A callback method when the tween animation updating
 typedef void OnTweenerUpdateCallback(double progress);
@@ -208,7 +208,7 @@ class Tweener implements TickerProvider {
     
     // Trying to improve performance: [Removed]
     if(top != null || left != null || right != null || bottom != null 
-    || width != null || height != null
+    || width != null || height != null || rotation != null
     || opacity != null || scale != null || x != null || y != null)
     {
       _animation = Tween(begin: 0.0, end: 1.0).animate(curve);
