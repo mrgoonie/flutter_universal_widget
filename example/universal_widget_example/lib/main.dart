@@ -122,6 +122,16 @@ class HomeScreen extends StatelessWidget {
                 ),
 
                 RaisedButton(
+                  child: Text("Opacity to 0.0"),
+                  onPressed: (){
+                    UniversalWidget.find("testWidget").update(
+                      duration: 1,
+                      opacity: 0,
+                    );
+                  },
+                ),
+
+                RaisedButton(
                   child: Text("Scale"),
                   onPressed: (){
                     UniversalWidget.find("testWidget").update(
