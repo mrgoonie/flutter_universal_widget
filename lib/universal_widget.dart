@@ -403,7 +403,7 @@ class UniversalWidget extends StatefulWidget {
   
   /// The state from the closest instance of this class that encloses the given context.
   static _UniversalWidgetState of(BuildContext context){
-    return context.ancestorStateOfType(TypeMatcher<_UniversalWidgetState>());
+    return context.findAncestorStateOfType<_UniversalWidgetState>();
   }
 
   @override
@@ -483,7 +483,7 @@ class _UniversalWidgetState extends State<UniversalWidget> {
       UniversalWidget.add(widget);
     }
 
-    _parentRenderType = context.ancestorRenderObjectOfType(TypeMatcher<RenderObject>()).runtimeType.toString();
+    _parentRenderType = context.findAncestorRenderObjectOfType<RenderObject>().runtimeType.toString();
     _isBuiltFirstTime = true;
 
     if(widget.onWidgetUpdated != null){
@@ -497,7 +497,7 @@ class _UniversalWidgetState extends State<UniversalWidget> {
 
     _isBuiltFirstTime = true;
 
-    _parentRenderType = context.ancestorRenderObjectOfType(TypeMatcher<RenderObject>()).runtimeType.toString();
+    _parentRenderType = context.findAncestorRenderObjectOfType<RenderObject>().runtimeType.toString();
 
     _controller = widget._controller ?? UniversalWidgetController();
     
@@ -1108,7 +1108,7 @@ class UniversalBuilder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context){
-    _UniversalWidgetState parentState = context.ancestorStateOfType(TypeMatcher<_UniversalWidgetState>());
+    _UniversalWidgetState parentState = context.findAncestorStateOfType<_UniversalWidgetState>();
     UniversalChannel channel = parentState.widget.channel;
     return builder(channel, context);
   }

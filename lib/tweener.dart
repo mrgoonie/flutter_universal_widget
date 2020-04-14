@@ -1,5 +1,7 @@
 library tweener;
 
+import 'dart:async';
+
 import 'package:flutter/animation.dart';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
