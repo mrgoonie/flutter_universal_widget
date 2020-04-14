@@ -550,7 +550,11 @@ class _UniversalWidgetState extends State<UniversalWidget> {
 
   _widgetListener(){
     // rebuild the widget:
-    if(mounted) setState((){});
+    if(mounted){
+      WidgetsBinding.instance.addPostFrameCallback((duration){
+        setState((){});
+      });
+    } 
 
     _oldController.copyFrom(_controller);
   }
